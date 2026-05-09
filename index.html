@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#fafaf9" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tracker" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://cdn.jsdelivr.net; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231c1917'/%3E%3Ctext x='50%25' y='62%25' font-size='40' text-anchor='middle' fill='%23fafaf9' font-family='system-ui'%3E%E2%9A%96%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Tracker</title>
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <h1 id="dateTitle">Сегодня</h1>
+      <div class="goal-pill" id="goalPill">—</div>
+    </header>
+
+    <div id="dayStatus" class="day-status" hidden>
+      <div class="ds-item" data-key="kcalIn" title="Сколько ккал съел сегодня — все приёмы пищи суммарно.">
+        <div class="ds-label">Съел</div>
+        <div class="ds-row"><span id="dsKcalIn" class="ds-num">0</span></div>
+      </div>
+      <div class="ds-item" title="Полный дневной расход = BMR (базовый метаболизм, сжигается просто на жизнь) + активность с часов или тренировок. Это сколько тело реально потратило за сутки.">
+        <div class="ds-label">Расход</div>
+        <div class="ds-row"><span id="dsKcalOut" class="ds-num">0</span></div>
+      </div>
+      <div class="ds-item" data-key="balance" title="Реальный энергобаланс = съел − (BMR + активность). Отрицательный = дефицит. Положительный = профицит.">
+        <div class="ds-label">Баланс</div>
+        <div class="ds-row"><span id="dsBalance" class="ds-num">—</span></div>
+      </div>
+      <div class="ds-item" data-key="remain" title="Сколько ещё можешь съесть сегодня, чтобы остаться в плановом дефиците (или профиците для набора). Зелёный = есть запас. Жёлтый/красный = уже перебрал плана.">
+        <div class="ds-label">Осталось</div>
+        <div class="ds-row"><span id="dsRemain" class="ds-num">—</span></div>
+      </div>
+      <div class="ds-item" data-key="protein" title="Белок съедено / цель">
+        <div class="ds-label">Белок</div>
+        <div class="ds-row"><span id="dsProtein" class="ds-num">0</span><span class="ds-sub" id="dsProteinGoal"></span></div>
+      </div>
+      <div class="ds-item" title="Тренировки сегодня">
+        <div class="ds-label">Трен.</div>
+        <div class="ds-row"><span id="dsWorkouts" class="ds-num">0</span></div>
+      </div>
+      <div class="ds-item" title="Настроение">
+        <div class="ds-label">Настр.</div>
+        <div class="ds-row"><span id="dsMood" class="ds-num">—</span></div>
+      </div>
+    </div>
+
+    <!-- ===== TODAY TAB ===== -->
+    <section class="view" data-view="today" hidden>
+      <div class="card" id="todayLogCard">
+        <div class="row between">
+          <h3>Сегодня в логе</h3>
+          <label class="upload-btn small-btn" title="Прогресс-фото">
+            <input type="file" id="photoInput" accept="image/*" capture="environment" hidden />
+            <span>📷</span>
+          </label>
+        </div>
+        <p class="muted small" id="todayHint">Записи добавляются через вкладку «Чат». Здесь — итог дня и редактирование.</p>
+        <div id="todayLog" class="day-log"></div>
+      </div>
+    </section>
+
+    <!-- ===== HISTORY TAB ===== -->
+    <section class="view" data-view="history" hidden>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- ===== STATS TAB ===== -->
+    <section class="view" data-view="stats" hidden>
+      <div class="card">
+        <div class="row between">
+          <h3 style="margin:0">Период</h3>
+          <select id="statsRange" class="range-select" title="Период для всех графиков и разбора">
+            <option value="7">7 дней</option>
+            <option value="30" selected>30 дней</option>
+            <option value="60">60 дней</option>
+            <option value="90">90 дней</option>
+            <option value="180">6 месяцев</option>
+            <option value="all">Всё</option>
+          </select>
+        </div>
+        <p class="muted small" id="statsRangeNote" style="margin:8px 0 0 0">Период применяется ко всем графикам ниже и к кнопке «Получить разбор».</p>
+      </div>
+
+      <div class="card">
+        <h3>Вес</h3>
+        <p class="metric-summary muted small" id="sumWeight"></p>
+        <canvas id="chartWeight" ></canvas>
+      </div>
+      <div class="card">
+        <h3>Ккал и БЖУ</h3>
+        <p class="metric-summary muted small" id="sumCalories"></p>
+        <canvas id="chartCalories" ></canvas>
+        <p class="metric-summary muted small" id="sumMacros" style="margin-top:8px"></p>
+        <canvas id="chartMacros" ></canvas>
+      </div>
+      <div class="card">
+        <h3>Баланс ккал (съел − полный расход)</h3>
+        <p class="muted small">Полный расход = BMR (базовый) + активность с часов / тренировок. Отрицательный = дефицит, положительный = профицит.</p>
+        <p class="metric-summary muted small" id="sumBalance"></p>
+        <canvas id="chartBalance" ></canvas>
+      </div>
+      <div class="card">
+        <h3>Тоннаж тренировок</h3>
+        <p class="muted small">Weight × reps. Для упражнений с собственным весом — твой текущий вес.</p>
+        <p class="metric-summary muted small" id="sumVolume"></p>
+        <canvas id="chartVolume" ></canvas>
+      </div>
+      <div class="card">
+        <h3>Активность, минут</h3>
+        <p class="metric-summary muted small" id="sumActivity"></p>
+        <canvas id="chartActivity" ></canvas>
+      </div>
+      <div class="card">
+        <h3>Настроение</h3>
+        <p class="metric-summary muted small" id="sumMood"></p>
+        <canvas id="chartMood" ></canvas>
+      </div>
+      <div class="card">
+        <div class="row between">
+          <h3>Анализ от ИИ</h3>
+          <button id="analyzeBtn" class="ghost">Получить разбор</button>
+        </div>
+        <div id="analysisOutput" class="muted small">Нажми «Получить разбор» — ИИ посмотрит на выбранный выше период и напишет, что заметил.</div>
+      </div>
+    </section>
+
+    <!-- ===== PHOTOS TAB ===== -->
+    <section class="view" data-view="photos" hidden>
+      <div class="card">
+        <h3>Прогресс по фото</h3>
+        <p class="muted small">Фото хранятся локально. Для сравнения с предыдущим — нажми на снимок.</p>
+        <div id="photoGrid" class="photo-grid"></div>
+      </div>
+      <div class="card" id="photoCompareCard" hidden>
+        <h3>Сравнение</h3>
+        <div class="row gap" id="photoCompareImages"></div>
+        <button id="runCompareBtn" class="ghost">Сравнить через ИИ</button>
+        <div id="photoCompareOutput" class="muted small"></div>
+      </div>
+    </section>
+
+    <!-- ===== CHAT TAB ===== -->
+    <section class="view chat-view" data-view="chat">
+      <div id="chatScroll" class="chat-scroll"></div>
+
+      <div class="chat-input-wrap">
+        <div class="row gap small chat-controls">
+          <label class="upload-btn small-btn" title="Прикрепить фото или видео">
+            <input type="file" id="chatAttach" accept="image/*,video/*" hidden />
+            <span>📎</span>
+          </label>
+          <button id="chatVoiceBtn" class="ghost small-btn" title="Голосовой ввод">🎙</button>
+          <select id="chatRange" class="range-select" title="Сколько дней контекста ИИ получит для ответа. «Авто» = сегодня + распознавание периода из текста (например «за неделю» → 7 дн).">
+            <option value="auto" selected>авто</option>
+            <option value="1">сегодня</option>
+            <option value="7">7 дн</option>
+            <option value="14">14 дн</option>
+            <option value="30">30 дн</option>
+            <option value="60">60 дн</option>
+            <option value="90">90 дн</option>
+            <option value="all">Всё</option>
+          </select>
+          <span id="chatAttachStatus" class="muted small"></span>
+          <button id="chatClearBtn" class="ghost small-btn" title="Очистить чат">🗑</button>
+        </div>
+        <div class="row gap">
+          <textarea id="chatInput" rows="2" placeholder="Например: завтрак овсянка с бананом, потом 5км бег. Что добрать на обед?"></textarea>
+          <button id="chatSendBtn" class="primary">→</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS TAB ===== -->
+    <section class="view" data-view="settings" hidden>
+      <div class="card">
+        <h3>Gemini API key</h3>
+        <p class="muted small">Получи бесплатный ключ на <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Хранится только в твоём браузере.</p>
+        <input type="password" id="apiKeyInput" placeholder="AIza..." autocomplete="off" />
+
+        <label class="lbl" style="margin-top:14px">Модель</label>
+        <select id="modelSelect">
+          <option value="gemini-2.5-flash">gemini-2.5-flash (рекомендуется, free tier)</option>
+          <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (быстрее, дешевле)</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro (умнее, медленнее, обычно платная)</option>
+          <option value="gemini-2.0-flash">gemini-2.0-flash (старая, на free tier limit: 0)</option>
+        </select>
+        <p class="muted small" style="margin-top:6px">Если получаешь ошибку «limit: 0» — попробуй другую модель. Кнопка «Проверить» делает живой тест.</p>
+
+        <div class="row gap end" style="margin-top:10px">
+          <button id="testKeyBtn" class="ghost">Проверить</button>
+          <button id="saveKeyBtn" class="primary">Сохранить</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Профиль</h3>
+        <p class="muted small">Используется для расчёта твоего дневного расхода (BMR + TDEE). ИИ опирается на эти цифры в советах.</p>
+        <div class="grid2">
+          <label>Пол
+            <select id="profileSex">
+              <option value="m">мужской</option>
+              <option value="f">женский</option>
+            </select>
+          </label>
+          <label>Возраст <input type="number" id="profileAge" min="10" max="120" /></label>
+          <label>Рост, см <input type="number" id="profileHeight" min="100" max="250" /></label>
+          <label>Вес, кг <input type="number" id="profileWeight" min="30" max="300" step="0.1" /></label>
+        </div>
+        <label class="lbl" style="margin-top:8px">Уровень повседневной активности (без тренировок)</label>
+        <select id="profileActivity">
+          <option value="sedentary">Малоподвижный — сидячая работа</option>
+          <option value="light">Лёгкий — лёгкие прогулки</option>
+          <option value="moderate" selected>Умеренный — обычно много хожу</option>
+          <option value="high">Высокий — физический труд</option>
+          <option value="very_high">Очень высокий — спорт + физ. труд</option>
+        </select>
+
+        <label class="lbl" style="margin-top:14px">Свой TDEE — если знаешь точно (необязательно)</label>
+        <input type="number" id="profileTdeeOverride" min="800" max="6000" placeholder="оставь пустым — посчитаю по формуле" />
+        <p class="muted small" style="margin-top:6px">Если измерял свой дневной расход на устройстве (InBody, smart scale, спирометр) или просто знаешь по опыту что нужно для поддержания веса — впиши сюда. Я возьму твою цифру вместо своего расчёта.</p>
+
+        <div id="profileCalc" class="muted small" style="margin-top:10px"></div>
+        <div class="row gap end">
+          <button id="saveProfileBtn" class="primary">Сохранить профиль</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Цель</h3>
+        <label class="lbl">Твоя цель — пиши своими словами</label>
+        <textarea id="goalText" rows="3" placeholder="Например: набрать 3 кг мышц к июню, грудь и плечи в приоритете, при этом не терять кардио. Сейчас вес 78, хочу 81. Сила — продолжать прогресс в жиме и приседе."></textarea>
+        <p class="muted small" style="margin-top:6px">ИИ-тренер видит этот текст и сверяется с ним в каждом ответе.</p>
+
+        <label class="lbl" style="margin-top:16px">Тип цели — для автоматического расчёта</label>
+        <select id="goalSelect">
+          <option value="muscle">Рост мышц / силы (профицит ~+300 ккал)</option>
+          <option value="recomp">Рекомпозиция (~−100 ккал, высокий белок ×2.0)</option>
+          <option value="loss">Снижение веса / жира (дефицит ~−400 ккал)</option>
+          <option value="fitness">Общая форма и здоровье (поддержание)</option>
+          <option value="endurance">Выносливость / спорт (~+100 ккал)</option>
+        </select>
+
+        <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:10px 12px; margin-top:14px; font-size:12.5px; color:var(--text-2); line-height:1.5">
+          <b style="color:var(--text)">Что такое дневные цели ниже.</b> Это <b>сколько тебе нужно СЪЕДАТЬ</b> в день, чтобы прийти к выбранной цели — не сколько сжигаешь.
+          Считаются автоматически из твоего профиля по формуле Mifflin-St Jeor (TDEE) + поправка на тип цели.
+          Подставятся сами как только заполнишь профиль выше. Можешь оставить или переопределить руками если знаешь свою норму точнее.
+        </div>
+
+        <div class="grid2">
+          <label>Ккал, цель/день <input type="number" id="targetKcal" min="0" placeholder="посчитаю сам" /></label>
+          <label>Белок, цель г/день <input type="number" id="targetProtein" min="0" placeholder="посчитаю сам" /></label>
+        </div>
+        <div class="row gap end">
+          <button id="autoTargetsBtn" class="ghost">Пересчитать из профиля</button>
+          <button id="saveGoalBtn" class="primary">Сохранить</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Резервная копия</h3>
+        <div class="row gap">
+          <button id="exportBtn" class="ghost">Экспорт JSON</button>
+          <label class="ghost btn-like">
+            Импорт JSON
+            <input type="file" id="importInput" accept="application/json" hidden />
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="danger-h">Опасная зона</h3>
+        <button id="wipeBtn" class="danger">Удалить все данные</button>
+      </div>
+
+      <div class="card muted small">
+        <p>Версия 0.1 · приложение работает офлайн, сетевые запросы идут только в Google Gemini API с твоим ключом.</p>
+      </div>
+    </section>
+
+    <nav class="tabbar">
+      <button data-tab="chat" class="tab active">Чат</button>
+      <button data-tab="today" class="tab">Сегодня</button>
+      <button data-tab="history" class="tab">История</button>
+      <button data-tab="stats" class="tab">Стата</button>
+      <button data-tab="photos" class="tab">Фото</button>
+      <button data-tab="settings" class="tab">⚙</button>
+    </nav>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="storage.js"></script>
+  <script src="gemini.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
