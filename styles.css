@@ -52,7 +52,15 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  /* Никакого горизонтального скролла на странице — содержимое не должно вылезать. */
+  overflow-x: hidden;
+  /* Резервируем место под вертикальный скроллбар чтобы контент не «прыгал» при появлении/исчезновении */
+  scrollbar-gutter: stable;
+  max-width: 100%;
+}
 
 /* CRITICAL: [hidden] должен работать даже на flex/grid контейнерах */
 [hidden] { display: none !important; }
@@ -655,10 +663,26 @@ button.danger:hover { background: var(--danger-soft); }
   font-size: 12px !important;
   font-family: var(--font-mono) !important;
 }
-.chat-input-wrap textarea { flex: 1; resize: none; padding: 10px 12px; }
+.chat-input-wrap textarea {
+  flex: 1;
+  resize: none;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 64px;
+  /* Auto-grow управляется из JS, тут только верхний предел чтоб не «съел» весь экран */
+  max-height: 180px;
+  border-radius: var(--r-md);
+  /* Избавляемся от внутреннего overflow когда не нужен — JS подгоняет высоту по контенту */
+  overflow-y: auto;
+}
 .chat-input-wrap button.primary {
-  padding: 0 16px; min-width: 46px; font-size: 16px;
-  border-radius: var(--r-sm);
+  padding: 0 18px;
+  min-width: 56px;
+  min-height: 64px;
+  font-size: 18px;
+  border-radius: var(--r-md);
+  align-self: stretch;
 }
 
 .empty-chat {

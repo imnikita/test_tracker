@@ -1076,6 +1076,7 @@
         state.chat.history = await Storage.getChatMessages();
         $('#chatInput').value = msg.content || '';
         $('#chatInput').focus();
+        autoResizeChatInput();
         await renderChat();
         await refreshDayStatus();
         flashStatus('Сообщение возвращено в редактирование', 'ok');
@@ -1218,6 +1219,21 @@
     }
   });
 
+  // Auto-grow textarea: высота подстраивается под контент до max-height (заданного в CSS).
+  // После этого включается внутренний скролл.
+  function autoResizeChatInput() {
+    const el = $('#chatInput');
+    if (!el) return;
+    el.style.height = 'auto';
+    // Берём scrollHeight (естественная высота) + клампим в [min, max] из CSS
+    const minH = parseInt(getComputedStyle(el).minHeight, 10) || 64;
+    const maxH = parseInt(getComputedStyle(el).maxHeight, 10) || 180;
+    el.style.height = Math.max(minH, Math.min(el.scrollHeight, maxH)) + 'px';
+  }
+  $('#chatInput').addEventListener('input', autoResizeChatInput);
+  // На старте — на случай если в textarea подгружается какой-то предзаполненный текст
+  autoResizeChatInput();
+
   $('#chatSendBtn').addEventListener('click', async () => {
     const input = $('#chatInput');
     const text = input.value.trim();
@@ -1235,6 +1251,7 @@
     });
     state.chat.history.push(userMsg);
     input.value = '';
+    input.style.height = '';  // сброс высоты после auto-grow
     state.chat.pendingAttachments = [];
     $('#chatAttachStatus').textContent = '';
     await renderChat();
