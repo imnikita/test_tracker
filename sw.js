@@ -1,7 +1,7 @@
 // sw.js — простой service worker для офлайн-работы статики.
 // Сетевые запросы к Gemini не кешируем — они должны идти онлайн.
 
-const CACHE = 'tracker-v6';
+const CACHE = 'tracker-v7';
 const ASSETS = [
   './',
   './index.html',
