@@ -44,20 +44,34 @@
     const base = 10 * p.weight_kg + 6.25 * p.height_cm - 5 * p.age;
     return Math.round(base + (p.sex === 'f' ? -161 : 5));
   }
+  // БАЗОВЫЙ РАСХОД БЕЗ ФИЗАКТИВНОСТИ.
+  // Семантика: то что пользователь тратит за день БЕЗ Apple-Watch-активности
+  // (BMR + бытовой NEAT, измеренный калориметром или взятый из BMR-формулы).
+  // К этому значению добавляется active_kcal с часов чтобы получить ПОЛНЫЙ расход.
+  // Приоритет: пользовательский замер (p.tdee_kcal как override) → формула Mifflin-St Jeor.
+  function calcBaseBurn(p) {
+    if (!p) return 0;
+    if (p.tdee_kcal && p.tdee_kcal > 0) return Math.round(p.tdee_kcal);
+    return calcBMR(p);
+  }
   function calcTDEE(p) {
     if (!p) return 0;
-    // Если пользователь вписал свой TDEE — берём его вместо расчётного
+    // Если пользователь вписал свой замер — берём его как базовый расход.
+    // ВАЖНО: это RMR-подобный показатель (без физактивности), а не классический
+    // TDEE с множителем активности. Активность с часов добавляется ОТДЕЛЬНО.
     if (p.tdee_kcal && p.tdee_kcal > 0) return Math.round(p.tdee_kcal);
     const bmr = calcBMR(p);
     if (!bmr) return 0;
     const factor = ({ sedentary: 1.2, light: 1.375, moderate: 1.55, high: 1.725, very_high: 1.9 })[p.activity] || 1.55;
     return Math.round(bmr * factor);
   }
-  // Достраивает профиль вычисляемыми полями для отправки в Gemini
+  // Достраивает профиль вычисляемыми полями для отправки в Gemini.
+  // В поле `bmr` передаём ИМЕННО базовый расход (override или формула) —
+  // это то с чем складывается active_kcal чтобы получить полный расход дня.
   function profileForAI() {
     const p = state.profile;
     if (!p || !p.age || !p.weight_kg) return null;
-    return { ...p, bmr: calcBMR(p), tdee: calcTDEE(p) };
+    return { ...p, bmr: calcBaseBurn(p), tdee: calcTDEE(p) };
   }
 
   // Сколько ккал «сжёг» в этот день. Apple Watch active_kcal уже включает все
@@ -111,8 +125,10 @@
     const protein = sum(meals, m => m.protein_g);
     // Активность сверх покоя (Apple Watch active или ккал тренировок).
     const activity = dayBurnKcal(day);
-    // Полный дневной расход = BMR + активность. Если профиля нет (BMR=0) — fallback на activity.
-    const userBmr = calcBMR(state.profile);
+    // Полный дневной расход = базовый_расход + активность.
+    // Базовый расход — это пользовательский замер (если есть) либо BMR-формула.
+    // Если профиля нет — fallback на одну только активность.
+    const userBmr = calcBaseBurn(state.profile);
     const kcalOut = userBmr ? userBmr + activity : activity;
     const mood = day && day.mood && day.mood.score != null ? day.mood.score : null;
 
@@ -318,9 +334,9 @@
     }
     const usingOverride = p.tdee_kcal && p.tdee_kcal > 0;
     if (usingOverride) {
-      el.innerHTML = `BMR ≈ <b>${bmr}</b> ккал · TDEE = <b>${tdee}</b> ккал/день <i>(твой override)</i>. Расчётный TDEE из формулы был бы ${Math.round(bmr * (({ sedentary: 1.2, light: 1.375, moderate: 1.55, high: 1.725, very_high: 1.9 })[p.activity] || 1.55))}.`;
+      el.innerHTML = `Базовый расход (твой замер) = <b>${tdee}</b> ккал/день — это что ты тратишь БЕЗ физактивности. К нему приложение добавляет active_kcal с часов чтобы получить полный расход. BMR по формуле для сравнения: ${bmr} ккал.`;
     } else {
-      el.innerHTML = `BMR ≈ <b>${bmr}</b> ккал · TDEE ≈ <b>${tdee}</b> ккал/день. Это твой расход с учётом повседневной активности, но без специальных тренировок.`;
+      el.innerHTML = `BMR ≈ <b>${bmr}</b> ккал · базовый расход ≈ <b>${tdee}</b> ккал/день (формула с учётом повседневной активности). К этому приложение добавляет active_kcal с часов чтобы получить полный расход.`;
     }
   }
   function goalLabel(g) {
@@ -657,11 +673,11 @@
     }]);
     setSummary('sumMood', summaryAvg(moods, '/10', 1));
 
-    // === 6) Баланс калорий — ПОЛНЫЙ: kcalIn − (BMR + активность) ===
-    // Вычитаем BMR (базовый метаболизм пользователя) — без него «баланс» это просто
-    // (съел − активные ккал), что не отражает реальный энергобаланс. См. также
-    // плитку «Баланс» в статус-баре — там та же формула.
-    const userBmrForChart = calcBMR(state.profile);
+    // === 6) Баланс калорий — ПОЛНЫЙ: kcalIn − (базовый_расход + активность) ===
+    // Вычитаем базовый расход (замер пользователя или BMR-формула) — без него
+    // «баланс» это просто (съел − активные ккал), что не отражает реальный
+    // энергобаланс. См. также плитку «Баланс» в статус-баре — там та же формула.
+    const userBmrForChart = calcBaseBurn(state.profile);
     const balance = slice.map(d => {
       const inK = sum(d.meals || [], m => m.kcal);
       const activity = dayBurnKcal(d);
